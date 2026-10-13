@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-<title>Signature Pages by Barb the Builder</title>
+<title>Signature Pages Technology by Barb The Builder</title>
 <style>
 :root{
   --paper:#f5ecdb;
@@ -131,11 +131,20 @@ canvas:active{cursor:grabbing}
 }
 .closed-book .cover-title{
   position:relative;z-index:2;
-  max-width:68%;
+  max-width:74%;
   text-align:center;
-  font:500 clamp(18px,2.0vw,30px)/1.35 Georgia,"Times New Roman",serif;
-  letter-spacing:.018em;
-  text-transform:lowercase;
+  color:#eee2d0;
+  letter-spacing:.012em;
+}
+.closed-book .cover-title span{
+  display:block;
+  font:500 clamp(14px,1.38vw,21px)/1.25 Georgia,"Times New Roman",serif;
+}
+.closed-book .cover-title small{
+  display:block;
+  margin-top:.46em;
+  font:400 clamp(10px,.92vw,14px)/1.2 Georgia,"Times New Roman",serif;
+  letter-spacing:.025em;
 }
 .book-wrap.opened .closed-book{
   transform:translate(-50%,-50%) perspective(1800px) rotateY(-162deg) translateX(-1%);
@@ -172,7 +181,9 @@ canvas:active{cursor:grabbing}
   .page-stack-left{left:-8px}.page-stack-right{right:-8px}.page-stack-bottom{bottom:-8px;height:9px}
   .corner{width:86px;height:86px}
   .closed-book{width:52%;height:92%;border-radius:8px 11px 11px 8px;box-shadow:8px 16px 28px rgba(0,0,0,.42),3px 0 0 #e7dccb,5px 0 0 #cfc0ad,inset 0 0 0 1px rgba(255,255,255,.045),inset 0 0 52px rgba(0,0,0,.17)}
-  .closed-book .cover-title{font-size:clamp(13px,3.3vw,20px);max-width:72%}
+  .closed-book .cover-title{max-width:78%}
+  .closed-book .cover-title span{font-size:clamp(11px,2.65vw,15px)}
+  .closed-book .cover-title small{font-size:clamp(8px,1.95vw,11px);margin-top:.42em}
   .close-edge{right:-12px;width:26px;top:11%;bottom:36%}
 }
 
@@ -188,7 +199,7 @@ canvas:active{cursor:grabbing}
 <body>
 <div class="stage">
   <div class="book-wrap awaiting-open" id="book">
-    <div class="closed-book" id="closedBook" aria-label="Open book"><div class="cover-title">technology by barb the builder</div></div>
+    <div class="closed-book" id="closedBook" aria-label="Open book"><div class="cover-title"><span>Signature Pages Technology</span><small>by Barb The Builder</small></div></div>
     <div class="close-edge" id="closeEdge" aria-label="Drag left to close book"></div>
     <div class="cover"></div>
     <div class="page-stack-left"></div>
@@ -238,15 +249,25 @@ canvas:active{cursor:grabbing}
     const c=document.createElement('canvas');c.width=Math.max(2,Math.round(PW*DPR));c.height=Math.max(2,Math.round(H*DPR));
     const g=c.getContext('2d');g.scale(DPR,DPR);
     const bg=g.createLinearGradient(0,0,PW,H);bg.addColorStop(0,'#f8f0e1');bg.addColorStop(.54,'#f3ead9');bg.addColorStop(1,'#e9dcc7');g.fillStyle=bg;g.fillRect(0,0,PW,H);
+    // fibrous paper, intentionally diffuse, not glossy
     for(let i=0;i<260;i++){
       const x=Math.random()*PW,y=Math.random()*H,w=Math.random()*2.6+.35,h=Math.random()*.5+.12,rot=Math.random()*Math.PI;
       g.save();g.translate(x,y);g.rotate(rot);g.fillStyle=`rgba(102,80,55,${Math.random()*.025})`;g.fillRect(-w/2,-h/2,w,h);g.restore();
     }
     const edge=g.createLinearGradient(0,0,PW,0);edge.addColorStop(0,'rgba(66,49,31,.05)');edge.addColorStop(.06,'rgba(0,0,0,0)');edge.addColorStop(.94,'rgba(0,0,0,0)');edge.addColorStop(1,'rgba(66,49,31,.04)');g.fillStyle=edge;g.fillRect(0,0,PW,H);
-    g.textAlign='center';g.fillStyle='#33271c';g.font=`500 ${Math.max(15,Math.min(PW*.062,H*.058))}px Georgia, serif`;
-    const lines=wrapText(g,'technology by barb the builder',PW*.66);let y=H*.50-(lines.length-1)*28;
-    for(const line of lines){g.fillText(line,PW/2,y);y+=Math.max(30,H*.073)}
+    g.textAlign='center';g.fillStyle='#33271c';
+    const titleSize=Math.max(11,Math.min(PW*.043,H*.038,22));
+    const bySize=Math.max(9,Math.min(PW*.031,H*.027,15));
+    g.font=`500 ${titleSize}px Georgia, serif`;
+    const titleLines=wrapText(g,'Signature Pages Technology',PW*.70);
+    const titleStep=titleSize*1.22;
+    const groupHeight=(titleLines.length-1)*titleStep + titleSize + bySize*1.7;
+    let y=H*.50-groupHeight*.33;
+    for(const line of titleLines){g.fillText(line,PW/2,y);y+=titleStep}
+    g.font=`400 ${bySize}px Georgia, serif`;
+    g.fillText('by Barb The Builder',PW/2,y+bySize*.55);
     if(backside){
+      // pre-mirror the backside so the reflected fold reads upright when it lands
       const m=document.createElement('canvas');m.width=c.width;m.height=c.height;const mg=m.getContext('2d');mg.translate(m.width,0);mg.scale(-1,1);mg.drawImage(c,0,0);return m;
     }
     return c;
@@ -277,6 +298,7 @@ canvas:active{cursor:grabbing}
   }
 
   function drawCurl(mode,D){
+    // Underlying spread always stays visible.
     drawStaticSpread();
 
     const nextMode=mode==='next';
@@ -294,6 +316,7 @@ canvas:active{cursor:grabbing}
     const backImg=nextMode?rightBackImg:leftBackImg;
     const pageX=nextMode?PW:0;
 
+    // shadow projected by the lifted sheet onto the spread
     if(flap.length>=3){
       const reflected=flap.map(p=>reflectPoint(p,M,n));
       ctx.save();polyClip(reflected);
@@ -303,10 +326,12 @@ canvas:active{cursor:grabbing}
       ctx.fillStyle=sh;ctx.fillRect(0,0,W,H);ctx.restore();
     }
 
+    // Portion still lying flat on its original side.
     if(front.length>=3){
       ctx.save();polyClip(front);ctx.drawImage(frontImg,pageX,0,PW,H);ctx.restore();
     }
 
+    // Reflected backside of the lifted sheet. The pre-mirrored source avoids reversed text.
     if(flap.length>=3){
       const dot=n.x*M.x+n.y*M.y;
       const a=1-2*n.x*n.x,b=-2*n.x*n.y,c=-2*n.x*n.y,d=1-2*n.y*n.y,e=2*n.x*dot,f=2*n.y*dot;
@@ -325,6 +350,7 @@ canvas:active{cursor:grabbing}
       ctx.fillStyle=foldLight;ctx.fillRect(0,0,W,H);ctx.restore();
     }
 
+    // traveling crease
     const len=Math.max(W,H)*2,tx=-n.y,ty=n.x;
     ctx.beginPath();ctx.moveTo(M.x-tx*len,M.y-ty*len);ctx.lineTo(M.x+tx*len,M.y+ty*len);ctx.strokeStyle='rgba(62,46,30,.18)';ctx.lineWidth=1.7;ctx.stroke();
     ctx.beginPath();ctx.moveTo(M.x-tx*len+n.x,M.y-ty*len+n.y);ctx.lineTo(M.x+tx*len+n.x,M.y+ty*len+n.y);ctx.strokeStyle='rgba(255,250,241,.18)';ctx.lineWidth=.8;ctx.stroke();
@@ -332,6 +358,7 @@ canvas:active{cursor:grabbing}
   }
 
   function drawLanding(mode){
+    // Full page has landed on the opposite side. Keep it visible briefly before advancing.
     drawStaticSpread();
     if(mode==='next') drawPage(rightImg,0); else drawPage(leftImg,PW);
     const g=ctx.createLinearGradient(PW-34,0,PW+34,0);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(.48,'rgba(46,33,22,.18)');g.addColorStop(.52,'rgba(255,250,240,.08)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.fillRect(PW-36,0,72,H);
@@ -470,6 +497,7 @@ canvas:active{cursor:grabbing}
       if(t<1){anim=requestAnimationFrame(tick);return}
       anim=0;
       if(commit){
+        // Keep the fully landed paper on screen before advancing. No disappearing handoff.
         visualDrag=null;landing=mode;render();
         setTimeout(()=>{
           spread+=mode==='next'?1:-1;
@@ -490,6 +518,7 @@ canvas:active{cursor:grabbing}
     const flexX=corner.x+(mode==='next'?-11:11);
     const flexY=H-10;
     pendingPointer={x,y};
+    // Tiny paper flex: the corner lifts first before following the drag.
     drag={mode,target:{x:flexX,y:flexY},display:{x:corner.x+(mode==='next'?-3:3),y:H-3},flexing:true};
     render();
     flexTimer=setTimeout(()=>{
@@ -507,6 +536,7 @@ canvas:active{cursor:grabbing}
     const commit=progress>.14;
     if(commit){
       pageSound(mode==='next'?1:-1);
+      // Exact final drag point makes the sheet land flat on the opposite page.
       const to=mode==='next'?{x:0,y:H}:{x:W,y:H};
       animatePoint(mode,from,to,980,true);
     }else{
