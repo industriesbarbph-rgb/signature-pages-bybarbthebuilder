@@ -1,0 +1,27 @@
+name: Build social preview image
+
+on:
+  push:
+    paths:
+      - "social-preview.png.b64"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Decode image
+        run: base64 --decode social-preview.png.b64 > social-preview.png
+      - name: Commit generated image
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add social-preview.png
+          git diff --cached --quiet && exit 0
+          git commit -m "Generate social preview image"
+          git push
