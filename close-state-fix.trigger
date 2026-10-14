@@ -1,1 +1,1 @@
-2026-10-14 close animation state repair
+2026-10-14 close animation state repair retry
