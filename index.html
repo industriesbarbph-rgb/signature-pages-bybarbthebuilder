@@ -462,7 +462,6 @@ canvas:active{cursor:grabbing}
     book.classList.remove('cover-dragging');
     book.classList.add('opened');
     setTimeout(()=>book.classList.remove('awaiting-open'),180);
-    setTimeout(()=>{if(bookOpened&&!coverDrag)closedBook.style.display='none';},1450);
   }
   function coverPose(progress){
     const p=clamp(progress,0,1);
@@ -499,10 +498,16 @@ canvas:active{cursor:grabbing}
     if(!coverDrag)return;
     const p=coverDrag.progress;
     const pointerId=coverDrag.pointerId;
-    const commit=!coverDrag.moved || p>.20;
+    const moved=coverDrag.moved;
+    const commit=!moved || p>.20;
     try{if(pointerId!=null&&closeEdge.hasPointerCapture(pointerId))closeEdge.releasePointerCapture(pointerId)}catch(_){}
     coverDrag=null;
-    closedBook.style.transition='transform 700ms cubic-bezier(.18,.82,.14,1), opacity 180ms ease, box-shadow 650ms ease';
+
+    closedBook.style.display='flex';
+    closedBook.style.opacity='1';
+    closedBook.style.pointerEvents='none';
+    closedBook.style.transition='transform 760ms cubic-bezier(.18,.82,.14,1), opacity 160ms ease, box-shadow 680ms ease';
+
     if(commit){
       coverSound();
       closedBook.style.transform=coverPose(1);
@@ -511,22 +516,27 @@ canvas:active{cursor:grabbing}
         bookOpened=false;
         book.classList.remove('opened','cover-dragging');
         book.classList.add('awaiting-open');
-        resetClosedBookInline();
-      },730);
+        closedBook.style.display='flex';
+        closedBook.style.transform=coverPose(1);
+        closedBook.style.opacity='1';
+        closedBook.style.pointerEvents='auto';
+        closedBook.style.transition='';
+        closedBook.querySelector('.cover-title').style.opacity='1';
+      },780);
     }else{
       closedBook.style.transform=coverPose(0);
       closedBook.querySelector('.cover-title').style.opacity='0';
       setTimeout(()=>{
         if(bookOpened){
           book.classList.remove('cover-dragging');
-          closedBook.style.display='none';
+          closedBook.style.display='flex';
           closedBook.style.transition='';
           closedBook.style.transform='';
           closedBook.style.opacity='';
           closedBook.style.pointerEvents='';
           closedBook.querySelector('.cover-title').style.opacity='';
         }
-      },730);
+      },780);
     }
   }
 
