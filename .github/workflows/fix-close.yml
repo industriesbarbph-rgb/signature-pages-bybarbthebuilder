@@ -1,0 +1,83 @@
+name: Fix closing interaction
+
+on:
+  push:
+    paths:
+      - "close-fix.trigger"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch close interaction
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('index.html')
+          s = p.read_text()
+
+          def replace_once(old, new, label):
+              global s
+              if old not in s:
+                  raise SystemExit(f'Missing expected fragment: {label}')
+              s = s.replace(old, new, 1)
+
+          replace_once(
+          ".close-edge{\n  position:absolute;right:-16px;top:10%;bottom:34%;width:30px;z-index:45;\n  opacity:0;pointer-events:none;cursor:grab;touch-action:none;\n  transition:opacity .22s ease;\n}",
+          ".close-edge{\n  position:absolute;right:-22px;top:5%;bottom:24%;width:72px;z-index:45;\n  opacity:0;pointer-events:none;cursor:grab;touch-action:none;\n  transition:opacity .22s ease;\n}",
+          'desktop close hit area')
+
+          replace_once(
+          ".book-wrap.cover-dragging .close-edge{opacity:0;pointer-events:none}",
+          ".book-wrap.cover-dragging .close-edge{opacity:.18;pointer-events:auto}",
+          'dragging close edge state')
+
+          replace_once(
+          "  .close-edge{right:-12px;width:26px;top:11%;bottom:36%}",
+          "  .close-edge{right:-18px;width:78px;top:4%;bottom:28%}",
+          'mobile close hit area')
+
+          replace_once(
+          '<div class="close-edge" id="closeEdge" aria-label="Drag left to close book"></div>',
+          '<div class="close-edge" id="closeEdge" role="button" tabindex="0" aria-label="Tap or drag left to close book"></div>',
+          'close edge markup')
+
+          replace_once(
+          "    coverDrag={startX:e.clientX,currentX:e.clientX,width:r.width,progress:0};\n    closedBook.style.display='flex';\n    closedBook.style.transition='none';",
+          "    coverDrag={startX:e.clientX,currentX:e.clientX,width:r.width,progress:0,pointerId:e.pointerId,moved:false};\n    try{if(e.pointerId!=null)closeEdge.setPointerCapture(e.pointerId)}catch(_){}\n    closedBook.style.display='flex';\n    closedBook.style.transition='none';",
+          'pointer capture setup')
+
+          replace_once(
+          "    coverDrag.currentX=e.clientX;\n    const dx=coverDrag.startX-e.clientX;",
+          "    coverDrag.currentX=e.clientX;\n    if(Math.abs(coverDrag.startX-e.clientX)>10)coverDrag.moved=true;\n    const dx=coverDrag.startX-e.clientX;",
+          'tap versus drag tracking')
+
+          replace_once(
+          "  function finishClose(){\n    if(!coverDrag)return;\n    const p=coverDrag.progress;\n    const commit=p>.34;\n    coverDrag=null;",
+          "  function finishClose(){\n    if(!coverDrag)return;\n    const p=coverDrag.progress;\n    const pointerId=coverDrag.pointerId;\n    const commit=!coverDrag.moved || p>.20;\n    try{if(pointerId!=null&&closeEdge.hasPointerCapture(pointerId))closeEdge.releasePointerCapture(pointerId)}catch(_){}\n    coverDrag=null;",
+          'tap close and easier drag threshold')
+
+          replace_once(
+          "  closeEdge.addEventListener('pointerdown',startClose,{passive:false});",
+          "  closeEdge.addEventListener('pointerdown',startClose,{passive:false});\n  closeEdge.addEventListener('keydown',e=>{\n    if((e.key==='Enter'||e.key===' ')&&bookOpened&&!locked&&!drag&&!visualDrag&&!landing&&!coverDrag){\n      e.preventDefault();\n      const r=book.getBoundingClientRect();\n      startClose({clientX:r.right,pointerId:null,preventDefault(){}});\n      if(coverDrag){coverDrag.moved=false;finishClose();}\n    }\n  });",
+          'keyboard close fallback')
+
+          p.write_text(s)
+          PY
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix reliable tap and drag closing interaction"
+          git push
