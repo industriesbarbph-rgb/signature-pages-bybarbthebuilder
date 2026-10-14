@@ -1,0 +1,116 @@
+name: Repair close animation state
+
+on:
+  push:
+    paths:
+      - "close-state-fix.trigger"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Repair close state handoff
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p=Path('index.html')
+          s=p.read_text()
+
+          old_open = '''  function openBook(){
+    if(bookOpened||coverDrag)return;
+    resetClosedBookInline();
+    bookOpened=true;
+    coverSound();
+    book.classList.remove('cover-dragging');
+    book.classList.add('opened');
+    setTimeout(()=>book.classList.remove('awaiting-open'),180);
+    setTimeout(()=>{if(bookOpened&&!coverDrag)closedBook.style.display='none';},1450);
+  }'''
+          new_open = '''  function openBook(){
+    if(bookOpened||coverDrag)return;
+    resetClosedBookInline();
+    bookOpened=true;
+    coverSound();
+    book.classList.remove('cover-dragging');
+    book.classList.add('opened');
+    setTimeout(()=>book.classList.remove('awaiting-open'),180);
+  }'''
+          if old_open not in s:
+              raise SystemExit('Expected openBook fragment not found')
+          s=s.replace(old_open,new_open,1)
+
+          pattern=r"  function finishClose\(\)\{.*?\n  \}\n\n  function getAudio"
+          replacement='''  function finishClose(){
+    if(!coverDrag)return;
+    const p=coverDrag.progress;
+    const pointerId=coverDrag.pointerId;
+    const moved=coverDrag.moved;
+    const commit=!moved || p>.20;
+    try{if(pointerId!=null&&closeEdge.hasPointerCapture(pointerId))closeEdge.releasePointerCapture(pointerId)}catch(_){}
+    coverDrag=null;
+
+    closedBook.style.display='flex';
+    closedBook.style.opacity='1';
+    closedBook.style.pointerEvents='none';
+    closedBook.style.transition='transform 760ms cubic-bezier(.18,.82,.14,1), opacity 160ms ease, box-shadow 680ms ease';
+
+    if(commit){
+      coverSound();
+      closedBook.style.transform=coverPose(1);
+      closedBook.querySelector('.cover-title').style.opacity='1';
+      setTimeout(()=>{
+        bookOpened=false;
+        book.classList.remove('opened','cover-dragging');
+        book.classList.add('awaiting-open');
+        // Lock the fully closed cover in place first. The next open resets these inline styles.
+        closedBook.style.display='flex';
+        closedBook.style.transform=coverPose(1);
+        closedBook.style.opacity='1';
+        closedBook.style.pointerEvents='auto';
+        closedBook.style.transition='';
+        closedBook.querySelector('.cover-title').style.opacity='1';
+      },780);
+    }else{
+      closedBook.style.transform=coverPose(0);
+      closedBook.querySelector('.cover-title').style.opacity='0';
+      setTimeout(()=>{
+        if(bookOpened){
+          book.classList.remove('cover-dragging');
+          // Keep the cover element alive; .opened CSS hides it safely without a display:none race.
+          closedBook.style.display='flex';
+          closedBook.style.transition='';
+          closedBook.style.transform='';
+          closedBook.style.opacity='';
+          closedBook.style.pointerEvents='';
+          closedBook.querySelector('.cover-title').style.opacity='';
+        }
+      },780);
+    }
+  }
+
+  function getAudio'''
+          s2,n=re.subn(pattern,replacement,s,count=1,flags=re.S)
+          if n!=1:
+              raise SystemExit(f'finishClose replacement count={n}')
+          s=s2
+
+          p.write_text(s)
+          PY
+      - name: Commit repaired close animation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Repair close animation state handoff"
+          git push
