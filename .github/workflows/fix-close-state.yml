@@ -4,7 +4,6 @@ on:
   push:
     paths:
       - "close-state-fix.trigger"
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,95 +16,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Repair close state handoff
+      - name: Patch close state
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
-
-          p=Path('index.html')
-          s=p.read_text()
-
-          old_open = '''  function openBook(){
-    if(bookOpened||coverDrag)return;
-    resetClosedBookInline();
-    bookOpened=true;
-    coverSound();
-    book.classList.remove('cover-dragging');
-    book.classList.add('opened');
-    setTimeout(()=>book.classList.remove('awaiting-open'),180);
-    setTimeout(()=>{if(bookOpened&&!coverDrag)closedBook.style.display='none';},1450);
-  }'''
-          new_open = '''  function openBook(){
-    if(bookOpened||coverDrag)return;
-    resetClosedBookInline();
-    bookOpened=true;
-    coverSound();
-    book.classList.remove('cover-dragging');
-    book.classList.add('opened');
-    setTimeout(()=>book.classList.remove('awaiting-open'),180);
-  }'''
-          if old_open not in s:
-              raise SystemExit('Expected openBook fragment not found')
-          s=s.replace(old_open,new_open,1)
-
-          pattern=r"  function finishClose\(\)\{.*?\n  \}\n\n  function getAudio"
-          replacement='''  function finishClose(){
-    if(!coverDrag)return;
-    const p=coverDrag.progress;
-    const pointerId=coverDrag.pointerId;
-    const moved=coverDrag.moved;
-    const commit=!moved || p>.20;
-    try{if(pointerId!=null&&closeEdge.hasPointerCapture(pointerId))closeEdge.releasePointerCapture(pointerId)}catch(_){}
-    coverDrag=null;
-
-    closedBook.style.display='flex';
-    closedBook.style.opacity='1';
-    closedBook.style.pointerEvents='none';
-    closedBook.style.transition='transform 760ms cubic-bezier(.18,.82,.14,1), opacity 160ms ease, box-shadow 680ms ease';
-
-    if(commit){
-      coverSound();
-      closedBook.style.transform=coverPose(1);
-      closedBook.querySelector('.cover-title').style.opacity='1';
-      setTimeout(()=>{
-        bookOpened=false;
-        book.classList.remove('opened','cover-dragging');
-        book.classList.add('awaiting-open');
-        // Lock the fully closed cover in place first. The next open resets these inline styles.
-        closedBook.style.display='flex';
-        closedBook.style.transform=coverPose(1);
-        closedBook.style.opacity='1';
-        closedBook.style.pointerEvents='auto';
-        closedBook.style.transition='';
-        closedBook.querySelector('.cover-title').style.opacity='1';
-      },780);
-    }else{
-      closedBook.style.transform=coverPose(0);
-      closedBook.querySelector('.cover-title').style.opacity='0';
-      setTimeout(()=>{
-        if(bookOpened){
-          book.classList.remove('cover-dragging');
-          // Keep the cover element alive; .opened CSS hides it safely without a display:none race.
-          closedBook.style.display='flex';
-          closedBook.style.transition='';
-          closedBook.style.transform='';
-          closedBook.style.opacity='';
-          closedBook.style.pointerEvents='';
-          closedBook.querySelector('.cover-title').style.opacity='';
-        }
-      },780);
-    }
-  }
-
-  function getAudio'''
-          s2,n=re.subn(pattern,replacement,s,count=1,flags=re.S)
-          if n!=1:
-              raise SystemExit(f'finishClose replacement count={n}')
-          s=s2
-
-          p.write_text(s)
-          PY
+          echo 'ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCmltcG9ydCByZQoKcCA9IFBhdGgoImluZGV4Lmh0bWwiKQpzID0gcC5yZWFkX3RleHQoZW5jb2Rpbmc9InV0Zi04IikKCm9sZF90aW1lciA9ICIgICAgc2V0VGltZW91dCgoKT0+e2lmKGJvb2tPcGVuZWQmJiFjb3ZlckRyYWcpY2xvc2VkQm9vay5zdHlsZS5kaXNwbGF5PSdub25lJzt9LDE0NTApO1xuIgppZiBvbGRfdGltZXIgbm90IGluIHM6CiAgICByYWlzZSBTeXN0ZW1FeGl0KCJFeHBlY3RlZCBvcGVuaW5nIGhpZGUgdGltZXIgbm90IGZvdW5kIikKcyA9IHMucmVwbGFjZShvbGRfdGltZXIsICIiLCAxKQoKcGF0dGVybiA9IHIiIiIgIGZ1bmN0aW9uIGZpbmlzaENsb3NlXChcKVx7CiAgICBpZlwoIWNvdmVyRHJhZ1wpcmV0dXJuOwogICAgY29uc3QgcD1jb3ZlckRyYWdcLnByb2dyZXNzOwogICAgY29uc3QgcG9pbnRlcklkPWNvdmVyRHJhZ1wucG9pbnRlcklkOwogICAgY29uc3QgY29tbWl0PSFjb3ZlckRyYWdcLm1vdmVkIFx8XHwgcD5cLjIwOwogICAgdHJ5XHtpZlwocG9pbnRlcklkIT1udWxsJiZjbG9zZUVkZ2VcLmhhc1BvaW50ZXJDYXB0dXJlXChwb2ludGVySWRcKVwpY2xvc2VFZGdlXC5yZWxlYXNlUG9pbnRlckNhcHR1cmVcKHBvaW50ZXJJZFwpXH1jYXRjaFwoX1wpXHtcfQogICAgY292ZXJEcmFnPW51bGw7CiAgICBjbG9zZWRCb29rXC5zdHlsZVwudHJhbnNpdGlvbj0ndHJhbnNmb3JtIDcwMG1zIGN1YmljLWJlemllclwoXC4xOCxcLjgyLFwuMTQsMVwpLCBvcGFjaXR5IDE4MG1zIGVhc2UsIGJveC1zaGFkb3cgNjUwbXMgZWFzZSc7CiAgICBpZlwoY29tbWl0XClcewogICAgICBjb3ZlclNvdW5kXChcKTsKICAgICAgY2xvc2VkQm9va1wuc3R5bGVcLnRyYW5zZm9ybT1jb3ZlclBvc2VcKDFcKTsKICAgICAgY2xvc2VkQm9va1wucXVlcnlTZWxlY3RvclwoJ1wuY292ZXItdGl0bGUnXClcLnN0eWxlXC5vcGFjaXR5PScxJzsKICAgICAgc2V0VGltZW91dFwoXChcKT0+XHsKICAgICAgICBib29rT3BlbmVkPWZhbHNlOwogICAgICAgIGJvb2tcLmNsYXNzTGlzdFwucmVtb3ZlXCgnb3BlbmVkJywnY292ZXItZHJhZ2dpbmcnXCk7CiAgICAgICAgYm9va1wuY2xhc3NMaXN0XC5hZGRcKCdhd2FpdGluZy1vcGVuJ1wpOwogICAgICAgIHJlc2V0Q2xvc2VkQm9va0lubGluZVwoXCk7CiAgICAgIFx9LDczMFwpOwogICAgXH1lbHNlXHsKICAgICAgY2xvc2VkQm9va1wuc3R5bGVcLnRyYW5zZm9ybT1jb3ZlclBvc2VcKDBcKTsKICAgICAgY2xvc2VkQm9va1wucXVlcnlTZWxlY3RvclwoJ1wuY292ZXItdGl0bGUnXClcLnN0eWxlXC5vcGFjaXR5PScwJzsKICAgICAgc2V0VGltZW91dFwoXChcKT0+XHsKICAgICAgICBpZlwoYm9va09wZW5lZFwpXHsKICAgICAgICAgIGJvb2tcLmNsYXNzTGlzdFwucmVtb3ZlXCgnY292ZXItZHJhZ2dpbmcnXCk7CiAgICAgICAgICBjbG9zZWRCb29rXC5zdHlsZVwuZGlzcGxheT0nbm9uZSc7CiAgICAgICAgICBjbG9zZWRCb29rXC5zdHlsZVwudHJhbnNpdGlvbj0nJzsKICAgICAgICAgIGNsb3NlZEJvb2tcLnN0eWxlXC50cmFuc2Zvcm09Jyc7CiAgICAgICAgICBjbG9zZWRCb29rXC5zdHlsZVwub3BhY2l0eT0nJzsKICAgICAgICAgIGNsb3NlZEJvb2tcLnN0eWxlXC5wb2ludGVyRXZlbnRzPScnOwogICAgICAgICAgY2xvc2VkQm9va1wucXVlcnlTZWxlY3RvclwoJ1wuY292ZXItdGl0bGUnXClcLnN0eWxlXC5vcGFjaXR5PScnOwogICAgICAgIFx9CiAgICAgIFx9LDczMFwpOwogICAgXH0KICBcfSIiIgpyZXBsYWNlbWVudCA9ICIiIiAgZnVuY3Rpb24gZmluaXNoQ2xvc2UoKXsKICAgIGlmKCFjb3ZlckRyYWcpcmV0dXJuOwogICAgY29uc3QgcD1jb3ZlckRyYWcucHJvZ3Jlc3M7CiAgICBjb25zdCBwb2ludGVySWQ9Y292ZXJEcmFnLnBvaW50ZXJJZDsKICAgIGNvbnN0IG1vdmVkPWNvdmVyRHJhZy5tb3ZlZDsKICAgIGNvbnN0IGNvbW1pdD0hbW92ZWQgfHwgcD4uMjA7CiAgICB0cnl7aWYocG9pbnRlcklkIT1udWxsJiZjbG9zZUVkZ2UuaGFzUG9pbnRlckNhcHR1cmUocG9pbnRlcklkKSljbG9zZUVkZ2UucmVsZWFzZVBvaW50ZXJDYXB0dXJlKHBvaW50ZXJJZCl9Y2F0Y2goXyl7fQogICAgY292ZXJEcmFnPW51bGw7CgogICAgY2xvc2VkQm9vay5zdHlsZS5kaXNwbGF5PSdmbGV4JzsKICAgIGNsb3NlZEJvb2suc3R5bGUub3BhY2l0eT0nMSc7CiAgICBjbG9zZWRCb29rLnN0eWxlLnBvaW50ZXJFdmVudHM9J25vbmUnOwogICAgY2xvc2VkQm9vay5zdHlsZS50cmFuc2l0aW9uPSd0cmFuc2Zvcm0gNzYwbXMgY3ViaWMtYmV6aWVyKC4xOCwuODIsLjE0LDEpLCBvcGFjaXR5IDE2MG1zIGVhc2UsIGJveC1zaGFkb3cgNjgwbXMgZWFzZSc7CgogICAgaWYoY29tbWl0KXsKICAgICAgY292ZXJTb3VuZCgpOwogICAgICBjbG9zZWRCb29rLnN0eWxlLnRyYW5zZm9ybT1jb3ZlclBvc2UoMSk7CiAgICAgIGNsb3NlZEJvb2sucXVlcnlTZWxlY3RvcignLmNvdmVyLXRpdGxlJykuc3R5bGUub3BhY2l0eT0nMSc7CiAgICAgIHNldFRpbWVvdXQoKCk9PnsKICAgICAgICBib29rT3BlbmVkPWZhbHNlOwogICAgICAgIGJvb2suY2xhc3NMaXN0LnJlbW92ZSgnb3BlbmVkJywnY292ZXItZHJhZ2dpbmcnKTsKICAgICAgICBib29rLmNsYXNzTGlzdC5hZGQoJ2F3YWl0aW5nLW9wZW4nKTsKICAgICAgICBjbG9zZWRCb29rLnN0eWxlLmRpc3BsYXk9J2ZsZXgnOwogICAgICAgIGNsb3NlZEJvb2suc3R5bGUudHJhbnNmb3JtPWNvdmVyUG9zZSgxKTsKICAgICAgICBjbG9zZWRCb29rLnN0eWxlLm9wYWNpdHk9JzEnOwogICAgICAgIGNsb3NlZEJvb2suc3R5bGUucG9pbnRlckV2ZW50cz0nYXV0byc7CiAgICAgICAgY2xvc2VkQm9vay5zdHlsZS50cmFuc2l0aW9uPScnOwogICAgICAgIGNsb3NlZEJvb2sucXVlcnlTZWxlY3RvcignLmNvdmVyLXRpdGxlJykuc3R5bGUub3BhY2l0eT0nMSc7CiAgICAgIH0sNzgwKTsKICAgIH1lbHNlewogICAgICBjbG9zZWRCb29rLnN0eWxlLnRyYW5zZm9ybT1jb3ZlclBvc2UoMCk7CiAgICAgIGNsb3NlZEJvb2sucXVlcnlTZWxlY3RvcignLmNvdmVyLXRpdGxlJykuc3R5bGUub3BhY2l0eT0nMCc7CiAgICAgIHNldFRpbWVvdXQoKCk9PnsKICAgICAgICBpZihib29rT3BlbmVkKXsKICAgICAgICAgIGJvb2suY2xhc3NMaXN0LnJlbW92ZSgnY292ZXItZHJhZ2dpbmcnKTsKICAgICAgICAgIGNsb3NlZEJvb2suc3R5bGUuZGlzcGxheT0nZmxleCc7CiAgICAgICAgICBjbG9zZWRCb29rLnN0eWxlLnRyYW5zaXRpb249Jyc7CiAgICAgICAgICBjbG9zZWRCb29rLnN0eWxlLnRyYW5zZm9ybT0nJzsKICAgICAgICAgIGNsb3NlZEJvb2suc3R5bGUub3BhY2l0eT0nJzsKICAgICAgICAgIGNsb3NlZEJvb2suc3R5bGUucG9pbnRlckV2ZW50cz0nJzsKICAgICAgICAgIGNsb3NlZEJvb2sucXVlcnlTZWxlY3RvcignLmNvdmVyLXRpdGxlJykuc3R5bGUub3BhY2l0eT0nJzsKICAgICAgICB9CiAgICAgIH0sNzgwKTsKICAgIH0KICB9IiIiCnMyLCBuID0gcmUuc3VibihwYXR0ZXJuLCByZXBsYWNlbWVudCwgcywgY291bnQ9MSwgZmxhZ3M9cmUuUykKaWYgbiAhPSAxOgogICAgcmFpc2UgU3lzdGVtRXhpdChmImZpbmlzaENsb3NlIHJlcGxhY2VtZW50IGNvdW50PXtufSIpCnAud3JpdGVfdGV4dChzMiwgZW5jb2Rpbmc9InV0Zi04IikK' | base64 -d > /tmp/patch.py
+          python /tmp/patch.py
       - name: Commit repaired close animation
         run: |
           git config user.name "github-actions[bot]"
