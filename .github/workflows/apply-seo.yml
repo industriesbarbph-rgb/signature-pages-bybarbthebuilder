@@ -1,0 +1,48 @@
+name: Apply SEO package
+
+on:
+  push:
+    paths:
+      - "seo-deploy.trigger"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch index SEO metadata
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p=Path('index.html')
+          s=p.read_text()
+          marker='<!-- SEO: Signature Pages Technology -->'
+          if marker not in s:
+              old='<title>Signature Pages Technology by Barb The Builder</title>'
+              seo='''<!-- SEO: Signature Pages Technology -->\n<title>Signature Pages Technology | Barb The Builder</title>\n<meta name="description" content="A tactile digital book experience with realistic paper flex, weighted page curls, two-page spreads, and full-screen page turning by Barb The Builder." />\n<meta name="author" content="Barb The Builder" />\n<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />\n<link rel="canonical" href="https://pagestechnology.barbph.com/" />\n<link rel="sitemap" type="application/xml" href="https://pagestechnology.barbph.com/sitemap.xml" />\n<meta name="theme-color" content="#16110d" />\n<meta property="og:type" content="website" />\n<meta property="og:site_name" content="Signature Pages Technology" />\n<meta property="og:title" content="Signature Pages Technology | Barb The Builder" />\n<meta property="og:description" content="A tactile digital book experience with realistic paper flex, weighted page curls, two-page spreads, and full-screen page turning." />\n<meta property="og:url" content="https://pagestechnology.barbph.com/" />\n<meta property="og:image" content="https://pagestechnology.barbph.com/social-preview.png" />\n<meta property="og:image:secure_url" content="https://pagestechnology.barbph.com/social-preview.png" />\n<meta property="og:image:type" content="image/png" />\n<meta property="og:image:width" content="1200" />\n<meta property="og:image:height" content="630" />\n<meta property="og:image:alt" content="Signature Pages Technology by Barb The Builder" />\n<meta name="twitter:card" content="summary_large_image" />\n<meta name="twitter:title" content="Signature Pages Technology | Barb The Builder" />\n<meta name="twitter:description" content="A tactile digital book experience with realistic paper flex, weighted page curls, two-page spreads, and full-screen page turning." />\n<meta name="twitter:image" content="https://pagestechnology.barbph.com/social-preview.png" />\n<meta name="twitter:image:alt" content="Signature Pages Technology by Barb The Builder" />\n<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "WebApplication",\n  "name": "Signature Pages Technology",\n  "url": "https://pagestechnology.barbph.com/",\n  "description": "A tactile digital book experience with realistic paper flex, weighted page curls, two-page spreads, and full-screen page turning by Barb The Builder.",\n  "image": "https://pagestechnology.barbph.com/social-preview.png",\n  "applicationCategory": "MultimediaApplication",\n  "operatingSystem": "Any",\n  "browserRequirements": "Requires JavaScript and a modern web browser.",\n  "creator": {\n    "@type": "Person",\n    "name": "Barb The Builder",\n    "url": "https://barbph.com/"\n  }\n}\n</script>'''
+              if old not in s:
+                  raise SystemExit('Expected title marker not found; refusing to rewrite index.')
+              s=s.replace(old,seo,1)
+
+              sr='''.seo-content{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;}\n'''
+              s=s.replace('</style>',sr+'</style>',1)
+              semantic='''\n<main class="seo-content" aria-label="About Signature Pages Technology">\n  <h1>Signature Pages Technology by Barb The Builder</h1>\n  <p>A tactile digital book experience with realistic paper flex, weighted page curls, two-page spreads, full-screen page turning, and touch interaction across mobile, tablet, and desktop.</p>\n</main>\n'''
+              s=s.replace('<body>','<body>'+semantic,1)
+              p.write_text(s)
+          PY
+      - name: Commit SEO metadata
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Add SEO and social preview metadata"
+          git push
