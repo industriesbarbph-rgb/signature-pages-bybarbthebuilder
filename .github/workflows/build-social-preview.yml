@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "index.html"
+      - ".github/workflows/build-social-preview.yml"
   workflow_dispatch:
 
 permissions:
