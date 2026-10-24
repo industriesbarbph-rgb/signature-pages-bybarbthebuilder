@@ -22,21 +22,21 @@ jobs:
           p = Path('index.html')
           s = p.read_text()
 
-          old = "function drawSpreadBase(){drawPage(leftImg,0,'left');drawPage(rightImg,PW,'right')}\nfunction drawSpine(){"
-          new = "function drawSpreadBase(){drawPage(leftImg,0,'left');drawPage(rightImg,PW,'right')}\nfunction clipOutsideBinding(bind){ctx.beginPath();ctx.rect(-PW,-H,PW*2-bind,H*3);ctx.rect(PW+bind,-H,PW*2,H*3);ctx.clip()}\nfunction drawSpine(){"
-          if old not in s:
-              raise SystemExit('drawSpreadBase/drawSpine anchor not found')
-          s = s.replace(old, new, 1)
+          anchor = "function drawSpreadBase(){drawPage(leftImg,0,'left');drawPage(rightImg,PW,'right')}"
+          helper = anchor + "\nfunction clipOutsideBinding(bind){ctx.beginPath();ctx.rect(-PW,-H,PW*2-bind,H*3);ctx.rect(PW+bind,-H,PW*2,H*3);ctx.clip()}"
+          if anchor not in s:
+              raise SystemExit('drawSpreadBase anchor not found')
+          s = s.replace(anchor, helper, 1)
 
           replacements = [
-              ("ctx.save();polyClip(reflectedFlap);const sw=", "ctx.save();clipOutsideBinding(bind);polyClip(reflectedFlap);const sw="),
+              ("ctx.save();polyClip(reflected);const sw=", "ctx.save();clipOutsideBinding(bind);polyClip(reflected);const sw="),
               ("ctx.save();ctx.transform(a,b,c,d,e,f);polyClip(flap);ctx.drawImage(backImg,pageX,0,PW,H);ctx.restore();", "ctx.save();clipOutsideBinding(bind);ctx.transform(a,b,c,d,e,f);polyClip(flap);ctx.drawImage(backImg,pageX,0,PW,H);ctx.restore();"),
-              ("ctx.save();polyClip(reflectedFlap);const fw=", "ctx.save();clipOutsideBinding(bind);polyClip(reflectedFlap);const fw="),
-              ("ctx.save();polyClip(reflectedFlap);ctx.beginPath();", "ctx.save();clipOutsideBinding(bind);polyClip(reflectedFlap);ctx.beginPath();"),
+              ("ctx.save();polyClip(reflected);const fw=", "ctx.save();clipOutsideBinding(bind);polyClip(reflected);const fw="),
+              ("ctx.save();polyClip(reflected);ctx.beginPath();", "ctx.save();clipOutsideBinding(bind);polyClip(reflected);ctx.beginPath();"),
           ]
           for a,b in replacements:
               if a not in s:
-                  raise SystemExit(f'patch anchor missing: {a[:48]}')
+                  raise SystemExit(f'patch anchor missing: {a[:60]}')
               s = s.replace(a,b,1)
 
           p.write_text(s)
@@ -49,6 +49,7 @@ jobs:
           const m=s.match(/<script>([\s\S]*?)<\/script>/);
           new Function(m[1]);
           if(!s.includes('function clipOutsideBinding(bind)')) throw new Error('binding clip missing');
+          if((s.match(/clipOutsideBinding\(bind\)/g)||[]).length < 5) throw new Error('not all reflected layers protected');
           console.log('syntax and binding clip OK');
           NODE
       - name: Commit final fix and remove one-shot workflow
