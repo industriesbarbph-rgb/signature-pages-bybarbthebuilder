@@ -301,7 +301,14 @@ canvas:active{cursor:grabbing}
       const x=Math.random()*PW,y=Math.random()*H,w=Math.random()*2.6+.35,h=Math.random()*.5+.12,rot=Math.random()*Math.PI;
       g.save();g.translate(x,y);g.rotate(rot);g.fillStyle=`rgba(102,80,55,${Math.random()*.025})`;g.fillRect(-w/2,-h/2,w,h);g.restore();
     }
-    const edge=g.createLinearGradient(0,0,PW,0);edge.addColorStop(0,'rgba(66,49,31,.05)');edge.addColorStop(.06,'rgba(0,0,0,0)');edge.addColorStop(.94,'rgba(0,0,0,0)');edge.addColorStop(1,'rgba(66,49,31,.04)');g.fillStyle=edge;g.fillRect(0,0,PW,H);
+    // Keep page-edge toning extremely subtle. The center crease is painted separately once,
+    // so individual page edges must not create a second dark strip at the spine.
+    const edge=g.createLinearGradient(0,0,PW,0);
+    edge.addColorStop(0,'rgba(66,49,31,.025)');
+    edge.addColorStop(.045,'rgba(0,0,0,0)');
+    edge.addColorStop(.955,'rgba(0,0,0,0)');
+    edge.addColorStop(1,'rgba(66,49,31,.02)');
+    g.fillStyle=edge;g.fillRect(0,0,PW,H);
     g.textAlign='center';g.fillStyle='#33271c';
     const titleSize=Math.max(11,Math.min(PW*.043,H*.038,22));
     const bySize=Math.max(9,Math.min(PW*.031,H*.027,15));
@@ -337,16 +344,33 @@ canvas:active{cursor:grabbing}
   function reflectPoint(p,M,n){const d=(p.x-M.x)*n.x+(p.y-M.y)*n.y;return{x:p.x-2*n.x*d,y:p.y-2*n.y*d}}
 
   function drawPage(img,x){ctx.save();roundRectPath(ctx,x,0,PW,H,4);ctx.clip();ctx.drawImage(img,x,0,PW,H);ctx.restore()}
+  function drawSpreadBase(){
+    drawPage(leftImg,0);
+    drawPage(rightImg,PW);
+  }
   function drawGutter(){
-    const grd=ctx.createLinearGradient(PW-24,0,PW+24,0);grd.addColorStop(0,'rgba(73,54,35,0)');grd.addColorStop(.40,'rgba(73,54,35,.16)');grd.addColorStop(.50,'rgba(32,23,15,.30)');grd.addColorStop(.60,'rgba(255,250,242,.08)');grd.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=grd;ctx.fillRect(PW-26,0,52,H);
+    // One narrow, balanced gutter. This is the only persistent center-spine shading.
+    const half=Math.max(8,Math.min(14,PW*.026));
+    const grd=ctx.createLinearGradient(PW-half,0,PW+half,0);
+    grd.addColorStop(0,'rgba(73,54,35,0)');
+    grd.addColorStop(.38,'rgba(73,54,35,.07)');
+    grd.addColorStop(.50,'rgba(40,29,20,.22)');
+    grd.addColorStop(.62,'rgba(73,54,35,.07)');
+    grd.addColorStop(1,'rgba(73,54,35,0)');
+    ctx.fillStyle=grd;
+    ctx.fillRect(PW-half,0,half*2,H);
+    ctx.fillStyle='rgba(45,32,22,.08)';
+    ctx.fillRect(Math.round(PW)-.5,0,1,H);
   }
   function drawStaticSpread(){
-    drawPage(leftImg,0);drawPage(rightImg,PW);drawGutter();
+    drawSpreadBase();
+    drawGutter();
   }
 
   function drawCurl(mode,D){
-    // Underlying spread always stays visible.
-    drawStaticSpread();
+    // Paint the base pages without a gutter first. The gutter is added once at the end,
+    // preventing doubled center shading while a sheet is moving.
+    drawSpreadBase();
 
     const nextMode=mode==='next';
     const rect=nextMode
@@ -354,7 +378,7 @@ canvas:active{cursor:grabbing}
       :[{x:0,y:0},{x:PW,y:0},{x:PW,y:H},{x:0,y:H}];
     const corner=nextMode?{x:W,y:H}:{x:0,y:H};
     const dx=corner.x-D.x,dy=corner.y-D.y,dist=Math.hypot(dx,dy);
-    if(dist<1.5)return;
+    if(dist<1.5){drawGutter();return;}
     const n={x:dx/dist,y:dy/dist};
     const M={x:(corner.x+D.x)/2,y:(corner.y+D.y)/2};
     const flap=clipHalfPlane(rect,M,n,true);
@@ -405,10 +429,11 @@ canvas:active{cursor:grabbing}
   }
 
   function drawLanding(mode){
-    // Full page has landed on the opposite side. Keep it visible briefly before advancing.
-    drawStaticSpread();
+    // Land the sheet first, then paint exactly one gutter on top. This prevents the
+    // temporary doubled/offset center strip that was visible after a page turn.
+    drawSpreadBase();
     if(mode==='next') drawPage(rightImg,0); else drawPage(leftImg,PW);
-    const g=ctx.createLinearGradient(PW-34,0,PW+34,0);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(.48,'rgba(46,33,22,.18)');g.addColorStop(.52,'rgba(255,250,240,.08)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.fillRect(PW-36,0,72,H);
+    drawGutter();
   }
 
   function render(){
